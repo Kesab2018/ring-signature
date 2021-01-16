@@ -19,13 +19,13 @@ import qualified Data.Map.Strict as Map
 
 -- p q g
 data Group = Group Integer Integer Integer
-    deriving (Show, Eq)
+  deriving (Show, Eq)
 -- x
 data Private = Private Integer 
-    deriving (Show, Eq)    
+  deriving (Show, Eq)    
 -- h = g ^ x (mod p) 
 data Public = Public Integer 
-    deriving (Show, Eq)
+  deriving (Show, Eq)
 
 
 type Random = Integer
