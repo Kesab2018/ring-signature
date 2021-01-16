@@ -87,10 +87,10 @@ firstH (Group _ q _) xs = mod (os2ip . hashWith SHA256 $xs) q
 --https://u.cs.biu.ac.il/~lindell/89-656/group%20example.pdf
 secondH :: Group -> BS.ByteString -> Integer
 secondH (Group p q _) xs = mod (ret * ret) p where
-    ret = mod (os2ip . hashWith SHA256 $xs) q -- prove it if we replace it by p then it will 
-    -- still have the same behaviour
-    -- (nub . sort  $ map (\x -> mod (x * x) 839) [1..419]) == 
-    -- (nub . sort  $ map (\x -> mod (x * x) 839) [1..838])
+  ret = mod (os2ip . hashWith SHA256 $xs) q -- prove it if we replace it by p then it will 
+  -- still have the same behaviour
+  -- (nub . sort  $ map (\x -> mod (x * x) 839) [1..419]) == 
+  -- (nub . sort  $ map (\x -> mod (x * x) 839) [1..838])
 
 stringBytestring :: String -> BS.ByteString
 stringBytestring = BS.pack
@@ -99,25 +99,26 @@ stringBytestring = BS.pack
 {- return p and q such that p = 2 * q + 1-}
 generatePrime :: Int -> IO (Integer, Integer)     
 generatePrime bitLength  = do 
-   p <- generateSafePrime bitLength
-   let q = div (p - 1) 2
-   return (p, q)
+  p <- generateSafePrime bitLength
+  let q = div (p - 1) 2
+  return (p, q)
 
 --http://cacr.uwaterloo.ca/hac/about/chap11.pdf#page=29
 --https://github.com/mukeshtiwari/verified-counting/blob/main/Elgamal.v#L59
 groupGenerator :: Integer -> Integer -> IO Group
 groupGenerator p q = 
   generateBetween 1 (p - 1) >>= \genCand ->
-  if | and [expSafe genCand q p == 1, expSafe genCand 2 p /= 1] ->  return (Group p q genCand)   
+  if | and [expSafe genCand q p == 1, 
+        expSafe genCand (div (p-1) q) p /= 1] ->  return (Group p q genCand)   
      | otherwise ->  groupGenerator p q 
 
 generateKey :: Group -> IO (Public, Private)
 generateKey gk@(Group p q g) = do
-    x <- generateMax q
-    let 
-        pk = Public (expSafe g x p)
-        sk = Private x
-    return (pk, sk)
+  x <- generateMax q
+  let 
+    pk = Public (expSafe g x p)
+    sk = Private x
+  return (pk, sk)
 
 
 test = do
