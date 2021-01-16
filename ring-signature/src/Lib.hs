@@ -17,6 +17,17 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 
 
+-- p q g
+data Group = Group Integer Integer Integer
+    deriving (Show, Eq)
+-- x
+data Private = Private Integer 
+    deriving (Show, Eq)    
+-- h = g ^ x (mod p) 
+data Public = Public Integer 
+    deriving (Show, Eq)
+
+
 type Random = Integer
 type Message = Integer
 type Sign = (Integer, Map.Map Int Integer, Integer)
@@ -59,43 +70,14 @@ verifySign gk@(Group p q g) pks sign@(c0, sis, ytilde) m = ret == c0 where
   ret = foldl (\ci i -> matefirstH gk pks ytilde m h ci (sis Map.! i) 
     (pks Map.! i)) c0 [0..(n-1)]
 
--- p q g
-data Group = Group Integer Integer Integer
-    deriving (Show, Eq)
--- h = g ^ x (mod p) 
-data Public = Public Integer 
-    deriving (Show, Eq)
--- x
-data Private = Private Integer 
-    deriving (Show, Eq)
 
-
-{- return p and q such that p = 2 * q + 1-}
-generatePrime :: Int -> IO (Integer, Integer)     
-generatePrime bitLength  = do 
-   p <- generateSafePrime bitLength
-   let q = div (p - 1) 2
-   return (p, q)
-
---http://cacr.uwaterloo.ca/hac/about/chap11.pdf#page=29
---https://github.com/mukeshtiwari/verified-counting/blob/main/Elgamal.v#L59
-groupGenerator :: Integer -> Integer -> IO Group
-groupGenerator p q = 
-  generateBetween 1 (p - 1) >>= \genCand ->
-  if | expSafe genCand (div (p - 1) q) p == 1 -> groupGenerator p q  
-     | otherwise -> return (Group p q genCand)
-
-
-
-
-generateKey :: Group -> IO (Public, Private)
-generateKey gk@(Group p q g) = do
-    x <- generateMax q
-    let 
-        pk = Public (expSafe g x p)
-        sk = Private x
-    return (pk, sk)
-
+matefirstH :: Group -> Map.Map Int Public -> Integer -> Integer -> 
+  Integer -> Integer -> Integer -> Public -> Integer
+matefirstH gk@(Group p q g) pks yt m h ci si (Public yi) = 
+  firstH gk (stringBytestring $(show pks) ++ 
+    (concatMap show [yt, m, mod (expSafe g si p * expSafe yi ci p) p, 
+      mod (expSafe h si p * expSafe yt ci p) p]))
+    
 
 -- https://eprint.iacr.org/2004/027.pdf
 -- https://crypto.stackexchange.com/questions/39877/what-is-a-cyclic-group-of-prime-order-q-such-that-the-dlp-is-hard
@@ -113,16 +95,29 @@ secondH (Group p q _) xs = mod (ret * ret) p where
 stringBytestring :: String -> BS.ByteString
 stringBytestring = BS.pack
 
-matefirstH :: Group -> Map.Map Int Public -> Integer -> Integer -> 
-  Integer -> Integer -> Integer -> Public -> Integer
-matefirstH gk@(Group p q g) pks yt m h ci si (Public yi) = 
-  firstH gk (stringBytestring $(show pks) ++ 
-    (concatMap show [yt, m, mod (expSafe g si p * expSafe yi ci p) p, 
-      mod (expSafe h si p * expSafe yt ci p) p]))
+      
+{- return p and q such that p = 2 * q + 1-}
+generatePrime :: Int -> IO (Integer, Integer)     
+generatePrime bitLength  = do 
+   p <- generateSafePrime bitLength
+   let q = div (p - 1) 2
+   return (p, q)
 
+--http://cacr.uwaterloo.ca/hac/about/chap11.pdf#page=29
+--https://github.com/mukeshtiwari/verified-counting/blob/main/Elgamal.v#L59
+groupGenerator :: Integer -> Integer -> IO Group
+groupGenerator p q = 
+  generateBetween 1 (p - 1) >>= \genCand ->
+  if | and [expSafe genCand q p == 1, expSafe genCand 2 p /= 1] ->  return (Group p q genCand)   
+     | otherwise ->  groupGenerator p q 
 
-
-
+generateKey :: Group -> IO (Public, Private)
+generateKey gk@(Group p q g) = do
+    x <- generateMax q
+    let 
+        pk = Public (expSafe g x p)
+        sk = Private x
+    return (pk, sk)
 
 
 test = do
@@ -139,4 +134,4 @@ test = do
   let pks = map fst (left ++ (pk, sk) : right)
       sign = genSig gk u sis (Map.fromList (zip [0..] pks)) pk sk m
       veri = verifySign gk (Map.fromList (zip [0..] pks)) sign m
-  return veri        
+  return veri      
